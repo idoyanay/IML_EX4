@@ -86,26 +86,7 @@ def get_gd_state_recorder_callback() -> Tuple[Callable[[], None], List[np.ndarra
         weights_list.append(weights.copy())
     return callback, values_list, weights_list
 
-    
-def plot_convergence(values: List[np.ndarray], title: str = "Convergence Plot") -> go.Figure:
-    """
-    Plot the convergence of the objective function values over iterations
-
-    Parameters:
-    -----------
-    values: List[np.ndarray]
-        List of objective function values recorded during the optimization process
-
-    title: str, default="Convergence Plot"
-        Title of the plot
-
-    Return:
-    -------
-    fig: go.Figure
-        Plotly figure showing the convergence of the objective function values over iterations
-    """
-    return go.Figure(data=go.Scatter(y=[v[0] for v in values], mode='lines+markers'),
-                     layout=go.Layout(title=title, xaxis=dict(title='Iteration'), yaxis=dict(title='Objective Value')))
+   
 
 
 def plot_decsent_and_convergence(module: Type[BaseModule], 
@@ -130,8 +111,8 @@ def plot_decsent_and_convergence(module: Type[BaseModule],
     fig_descent = plot_descent_path(module, np.array(weights), title=f"{module.__name__} Descent Path with eta={eta}",
                                     xrange=xrange, yrange=yrange)
     # Plot the convergence
-    fig_convergence = plot_convergence(values, title=f"{module.__name__} Convergence with eta={eta}")
-    return fig_descent, fig_convergence
+    trace_convergence = go.Scatter(y=[v[0] for v in values], mode='lines+markers', name=f"learning rate: {eta}")
+    return fig_descent, trace_convergence
 
 
 def compare_fixed_learning_rates(init: np.ndarray = np.array([np.sqrt(2), np.e / 3]),
@@ -143,22 +124,34 @@ def compare_fixed_learning_rates(init: np.ndarray = np.array([np.sqrt(2), np.e /
     # Plot algorithm's descent path
     # Plot algorithm's convergence for the different values of eta
     """
-    L1_figs = []
-    L2_figs = []
+    L1_descent_figs = []
+    L2_descent_figs = []
+    L1_conv_traces = []
+    L2_conv_traces = []
     for eta in etas:
-        fig_descent_L1, fig_convergence_L1 = plot_decsent_and_convergence(L1, eta=eta, init=init)
-        fig_descent_L2, fig_convergence_L2 = plot_decsent_and_convergence(L2, eta=eta, init=init)
-        L1_figs.append((fig_descent_L1, fig_convergence_L1))
-        L2_figs.append((fig_descent_L2, fig_convergence_L2))
+        fig_descent_L1, trace_convergence_L1 = plot_decsent_and_convergence(L1, eta=eta, init=init)
+        fig_descent_L2, trace_convergence_L2 = plot_decsent_and_convergence(L2, eta=eta, init=init)
+        L1_descent_figs.append(fig_descent_L1)
+        L2_descent_figs.append(fig_descent_L2)
+        L1_conv_traces.append(trace_convergence_L1)
+        L2_conv_traces.append(trace_convergence_L2)
         
-    # plot all figures seperately
-    for i, (fig_descent_L1, fig_convergence_L1) in enumerate(L1_figs):
-        fig_descent_L1.show()
-        fig_convergence_L1.show()
-    for i, (fig_descent_L2, fig_convergence_L2) in enumerate(L2_figs):
-        fig_descent_L2.show()
-        fig_convergence_L2.show()
+    for fig in L1_descent_figs:
+        fig.show()
+    for fig in L2_descent_figs:
+        fig.show()
+    fig_L1_convergence = go.Figure(data=L1_conv_traces,
+                               layout=go.Layout(title="L1 Convergence for Different Learning Rates",
+                                                xaxis_title="Iteration",
+                                                yaxis_title="Objective Value"))
 
+    fig_L2_convergence = go.Figure(data=L2_conv_traces,
+                               layout=go.Layout(title="L2 Convergence for Different Learning Rates",
+                                                xaxis_title="Iteration",
+                                                yaxis_title="Objective Value"))
+
+    fig_L1_convergence.show()
+    fig_L2_convergence.show()
 
 
 
