@@ -136,8 +136,14 @@ class LogisticModule(BaseModule):
             Value of function at point self.weights
         """
         m = X.shape[0]
-        logits = X @ self.weights
-        log_likelihood = np.sum(y * logits - np.log(1 + np.exp(logits)))
+        z = X @ self.weights  
+        sigma = 1 / (1 + np.exp(-z))  # sigmoid
+
+        # avoid log(0) issues by clipping values slightly away from 0/1
+        eps = 1e-15
+        sigma = np.clip(sigma, eps, 1 - eps)
+
+        log_likelihood = np.sum(y * np.log(sigma) + (1 - y) * np.log(1 - sigma))
         return np.array([-log_likelihood / m])
 
     def compute_jacobian(self, X: np.ndarray, y: np.ndarray, **kwargs) -> np.ndarray:
@@ -158,9 +164,9 @@ class LogisticModule(BaseModule):
             Derivative of function with respect to self.weights at point self.weights
         """
         m = X.shape[0]
-        logits = X @ self.weights
-        probabilities = 1 / (1 + np.exp(-logits))
-        gradient = -X.T @ (y - probabilities) / m
+        z = X @ self.weights                       # shape (m,)
+        probs = 1 / (1 + np.exp(-z))               # sigmoid(z), shape (m,)
+        gradient = - (X.T @ (y - probs)) / m       # matrix form
         return gradient
 
 
@@ -206,6 +212,10 @@ class RegularizedModule(BaseModule):
                 self.regularization_module_.weights = weights[1:]
             else:
                 self.regularization_module_.weights = weights
+            self.fidelity_module_.weights = weights
+
+        # -----
+        if weights is not None:
             self.weights = weights
 
     def compute_output(self, **kwargs) -> np.ndarray:
@@ -240,9 +250,13 @@ class RegularizedModule(BaseModule):
         output: ndarray of shape (n_in,)
             Derivative with respect to self.weights at point self.weights
         """
-        fidelity_jacobian = self.fidelity_module_.compute_jacobian(**kwargs)
-        regularization_jacobian = self.regularization_module_.compute_jacobian(**kwargs)
-        return fidelity_jacobian + self.lam_ * regularization_jacobian
+        fidelity_grad = self.fidelity_module_.compute_jacobian(**kwargs)
+        reg_grad = self.regularization_module_.compute_jacobian()
+
+        if self.include_intercept_:
+            reg_grad = np.insert(reg_grad, 0, 0.0)
+
+        return fidelity_grad + self.lam_ * reg_grad
 
     @property
     def weights(self):

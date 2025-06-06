@@ -6,6 +6,9 @@ from base_module import BaseModule
 from base_learning_rate import  BaseLR
 from gradient_descent import GradientDescent
 from learning_rate import FixedLR
+from sklearn.metrics import roc_curve, auc
+from loss_functions import misclassification_error
+from cross_validate import cross_validate
 
 
 
@@ -186,20 +189,109 @@ def load_data(path: str = "SAheart.data", train_portion: float = .8) -> \
     df.famhist = (df.famhist == 'Present').astype(int)
     return split_train_test(df.drop(['chd', 'row.names'], axis=1), df.chd, train_portion)
 
+def plot_convergence_logistic_regression(X_train: pd.DataFrame, y_train:pd.Series, X_test: pd.DataFrame, y_test: pd.Series):
+    include_intercept = True # TODO - this is ny descision, not asked in the task. 
+    etas = (1, .1, .01, .001) # TODO - this is my descision, not asked in the task.
+    regularizations = ["l1", "l2", "none"]
+    log_convergence_traces = []
+    for reg in regularizations:
+        reg_trace = []
+        for eta in etas:
+            callback, values, weights = get_gd_state_recorder_callback()
+            fixed_lr = FixedLR(base_lr=eta)
+            gd_solver = GradientDescent(learning_rate=fixed_lr, max_iter=1000, tol=1e-6, callback=callback)
+            log_reg = LogisticRegression(solver=gd_solver, include_intercept=include_intercept)
+            
+            log_reg.fit(X_train.to_numpy(), y_train.to_numpy())
+            trace_convergence = go.Scatter(y=[v[0] for v in values], mode='lines+markers', name=f"learning rate: {eta}")
+            reg_trace.append(trace_convergence)
+        log_convergence_traces.append(reg_trace)
+
+    fig_l1_convergence = go.Figure(data=log_convergence_traces[0],
+                                layout=go.Layout(title="LogisticRegression Convergence for Different Learning Rates (with L1 regularization, lambda=1, alpha=0.5)",
+                                                    xaxis_title="Iteration",
+                                                    yaxis_title="objective Value"))
+    fig_l2_convergence = go.Figure(data=log_convergence_traces[1],
+                                layout=go.Layout(title="LogisticRegression Convergence for Different Learning Rates (with L2 regularization, lambda=1, alpha=0.5)",
+                                                    xaxis_title="Iteration",
+                                                    yaxis_title="objective Value"))
+    fig_none_convergence = go.Figure(data=log_convergence_traces[2],
+                                layout=go.Layout(title="LogisticRegression Convergence for Different Learning Rates (without regularization, lambda=1, alpha=0.5)",
+                                                    xaxis_title="Iteration",
+                                                    yaxis_title="objective Value"))
+    fig_l1_convergence.show()
+    fig_l2_convergence.show()
+    fig_none_convergence.show()
+    
+
+    
+
+def plot_roc(X_train: pd.DataFrame, y_train: pd.Series, X_test: pd.DataFrame, y_test: pd.Series) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
+    # Convert to NumPy arrays
+    X_train = X_train.to_numpy()
+    y_train = y_train.to_numpy()
+    X_test = X_test.to_numpy()
+    y_test = y_test.to_numpy()
+
+    # Fit model
+    model = LogisticRegression() # default values
+    model.fit(X_train, y_train)
+
+    # Predict probabilities
+    y_prob = model.predict_proba(X_test)
+
+    # Compute ROC curve
+    fpr, tpr, thresholds = roc_curve(y_test, y_prob)
+    roc_auc = auc(fpr, tpr)
+
+    # Plot
+    fig = go.Figure(
+            data=[go.Scatter(x=[0,1], y=[0,1], mode="lines", line=dict(color="black", dash='dash'), name="Random Class Assignment"),
+                go.Scatter(x=fpr, y=tpr, mode='markers+lines',text=thresholds, name="", showlegend=False, marker_size=5, marker_color="blue",
+                            hovertemplate="<b>Threshold:</b>%{text:.3f}<br>FPR: %{x:.3f}<br>TPR: %{y:.3f}")],
+            layout=go.Layout(title=rf"$\text{{ROC Curve Of Fitted Model - AUC}}={auc(fpr, tpr):.6f}$", 
+                                        xaxis=dict(title=r"$\text{False Positive Rate (FPR)}$"),
+                                 yaxis=dict(title=r"$\text{True Positive Rate (TPR)}$")))
+    fig.show()
+    
+    return fpr, tpr, thresholds, y_prob
+
+def estimate_LogL1(X_train: pd.DataFrame, y_train: pd.Series, X_test: pd.DataFrame, y_test: pd.Series) -> None:
+
+    X_train, y_train, X_test, y_test = X_train.to_numpy(), y_train.to_numpy(), X_test.to_numpy(), y_test.to_numpy()
+    alpha, max_iter, lr = 0.5, 20000, 1e-4
+    lambdas = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1]
+    results = []
+    for lam in lambdas:
+        gd_solver = GradientDescent(max_iter=max_iter, learning_rate=FixedLR(lr))
+        model = LogisticRegression(solver=gd_solver, penalty="l1", lam=lam, alpha=alpha)
+        trains_score, val_score = cross_validate(model, X_train, y_train, misclassification_error)
+        results.append((lam, trains_score, val_score))
+
+    best_lambda, best_train, best_val = min(results, key=lambda t: t[2])  # minimize validation error
+    print(f"Best lambda: {best_lambda}, Train error: {best_train:.3f}, Validation error: {best_val:.3f}")
+
+
+
 
 def fit_logistic_regression():
     # Load and split SA Heard Disease dataset
     X_train, y_train, X_test, y_test = load_data()
 
     # Plotting convergence rate of logistic regression over SA heart disease data
-    raise NotImplementedError()
+    # --- plot_convergence_logistic_regression(X_train, y_train, X_test, y_test)--- TODO this part is depend on the answer from the forum
+    # fpr, tpr, thresholds, y_prob = plot_roc(X_train, y_train, X_test, y_test)
+    # best_thr_idx = np.argmax(tpr - fpr)
+    # best_threshold = thresholds[best_thr_idx]
+    # test_error = np.mean((y_prob >= best_threshold).astype(int) != y_test)
+    # print(f"Best threshold: {best_threshold}, Test error: {test_error}")
+
 
     # Fitting l1- and l2-regularized logistic regression models, using cross-validation to specify values
     # of regularization parameter
-    raise NotImplementedError()
-
+    estimate_LogL1(X_train, y_train, X_test, y_test)
 
 if __name__ == '__main__':
     np.random.seed(0)
-    compare_fixed_learning_rates()
-    # fit_logistic_regression()
+    # compare_fixed_learning_rates()
+    fit_logistic_regression()

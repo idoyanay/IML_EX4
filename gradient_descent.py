@@ -133,28 +133,28 @@ class GradientDescent:
             eta = self.learning_rate_.lr_step(t=t)
 
             # Compute current weights
-            w_prev = f.weights_.copy()
-            f.weights_ -= eta * grad
+            w_prev = f.weights.copy()
+            f.weights -= eta * grad
 
             # Compute the Euclidean norm of the difference between current and previous weights
-            delta = np.linalg.norm(f.weights_ - w_prev)
+            delta = np.linalg.norm(f.weights - w_prev)
 
             # Call the callback function with the current state
-            self.callback_(solver=self, weights=f.weights_, val=val, grad=grad, t=t, eta=eta, delta=delta)
+            self.callback_(solver=self, weights=f.weights, val=val, grad=grad, t=t, eta=eta, delta=delta)
 
             # Update the solution vector if needed
             if self.out_type_ == "best":
                 if self.best_val is None or val < self.best_val:
-                    self.solution_ = f.weights_.copy()
+                    self.solution_ = f.weights.copy()
                     self.best_val = val
             elif self.out_type_ == "average":
                 if self.solution_ is None:
-                    self.solution_ = f.weights_.copy()
+                    self.solution_ = f.weights.copy()
                 else:
                     alpha = 1 / t
-                    self.solution_ = (1 - alpha) * self.solution_ + alpha * f.weights_
+                    self.solution_ = (1 - alpha) * self.solution_ + alpha * f.weights
             elif self.out_type_ == "last":
-                self.solution_ = f.weights_.copy()
+                self.solution_ = f.weights.copy()
 
 
             # Check stopping criterion
