@@ -214,9 +214,7 @@ class RegularizedModule(BaseModule):
                 self.regularization_module_.weights = weights
             self.fidelity_module_.weights = weights
 
-        # -----
-        if weights is not None:
-            self.weights = weights
+
 
     def compute_output(self, **kwargs) -> np.ndarray:
         """

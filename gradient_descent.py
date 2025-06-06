@@ -77,10 +77,6 @@ class GradientDescent:
         self.max_iter_ = max_iter
         self.callback_ = callback
 
-        # initialize the solution vector to None
-        self.solution_ = None
-        self.best_val = None  # To keep track of the best value found during optimization
-
     def fit(self, f: BaseModule, X: np.ndarray, y: np.ndarray):
         """
         Optimize module using Gradient Descent iterations over given input samples and responses
@@ -124,6 +120,7 @@ class GradientDescent:
                 Euclidean norm of w^(t)-w^(t-1)
 
         """
+        best_val,solution = 0, None
         for t in range(1, self.max_iter_+1):
             # Compute current output and jacbian
             val = f.compute_output(X=X, y=y)
@@ -144,21 +141,21 @@ class GradientDescent:
 
             # Update the solution vector if needed
             if self.out_type_ == "best":
-                if self.best_val is None or val < self.best_val:
-                    self.solution_ = f.weights.copy()
-                    self.best_val = val
+                if best_val is None or val < best_val:
+                    solution = f.weights.copy()
+                    best_val = val
             elif self.out_type_ == "average":
-                if self.solution_ is None:
-                    self.solution_ = f.weights.copy()
+                if solution is None:
+                    solution = f.weights.copy()
                 else:
                     alpha = 1 / t
-                    self.solution_ = (1 - alpha) * self.solution_ + alpha * f.weights
+                    solution = (1 - alpha) * solution + alpha * f.weights
             elif self.out_type_ == "last":
-                self.solution_ = f.weights.copy()
+                solution = f.weights.copy()
 
 
             # Check stopping criterion
             if delta < self.tol_:
                 break
-        return self.solution_
+        return solution
             

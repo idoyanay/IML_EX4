@@ -111,7 +111,7 @@ def plot_decsent_and_convergence(module: Type[BaseModule],
     gd_solver.fit(module_instance, X=None, y=None)
 
     # Plot the descent path
-    fig_descent = plot_descent_path(module, np.array(weights), title=f"{module.__name__} Descent Path with eta={eta}",
+    fig_descent = plot_descent_path(module, np.array(weights), title=f", {module.__name__} regularization, eta={eta}",
                                     xrange=xrange, yrange=yrange)
     # Plot the convergence
     trace_convergence = go.Scatter(y=[v[0] for v in values], mode='lines+markers', name=f"learning rate: {eta}")
@@ -256,7 +256,7 @@ def plot_roc(X_train: pd.DataFrame, y_train: pd.Series, X_test: pd.DataFrame, y_
     
     return fpr, tpr, thresholds, y_prob
 
-def estimate_LogL1(X_train: pd.DataFrame, y_train: pd.Series, X_test: pd.DataFrame, y_test: pd.Series) -> None:
+def estimate_LogReg(X_train: pd.DataFrame, y_train: pd.Series, X_test: pd.DataFrame, y_test: pd.Series, penalty:str = 'none') -> None:
 
     X_train, y_train, X_test, y_test = X_train.to_numpy(), y_train.to_numpy(), X_test.to_numpy(), y_test.to_numpy()
     alpha, max_iter, lr = 0.5, 20000, 1e-4
@@ -264,9 +264,19 @@ def estimate_LogL1(X_train: pd.DataFrame, y_train: pd.Series, X_test: pd.DataFra
     results = []
     for lam in lambdas:
         gd_solver = GradientDescent(max_iter=max_iter, learning_rate=FixedLR(lr))
-        model = LogisticRegression(solver=gd_solver, penalty="l1", lam=lam, alpha=alpha)
+        model = LogisticRegression(solver=gd_solver, penalty=penalty, lam=lam, alpha=alpha)
         trains_score, val_score = cross_validate(model, X_train, y_train, misclassification_error)
         results.append((lam, trains_score, val_score))
+    
+    # plot line-graph of the train and validation errors for each lambda
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=[r[0] for r in results], y=[r[1] for r in results], mode='lines+markers', name='Train Error'))
+    fig.add_trace(go.Scatter(x=[r[0] for r in results], y=[r[2] for r in results], mode='lines+markers', name='Validation Error'))
+    fig.update_layout(title='Train and Validation Errors for Different Lambda Values, with penalty=' + penalty.upper(),
+                      xaxis_title='Lambda',
+                      yaxis_title='Error',
+                      legend=dict(title='Error Type'))
+    fig.show()
 
     best_lambda, best_train, best_val = min(results, key=lambda t: t[2])  # minimize validation error
     print(f"Best lambda: {best_lambda}, Train error: {best_train:.3f}, Validation error: {best_val:.3f}")
@@ -280,18 +290,21 @@ def fit_logistic_regression():
 
     # Plotting convergence rate of logistic regression over SA heart disease data
     # --- plot_convergence_logistic_regression(X_train, y_train, X_test, y_test)--- TODO this part is depend on the answer from the forum
-    # fpr, tpr, thresholds, y_prob = plot_roc(X_train, y_train, X_test, y_test)
-    # best_thr_idx = np.argmax(tpr - fpr)
-    # best_threshold = thresholds[best_thr_idx]
-    # test_error = np.mean((y_prob >= best_threshold).astype(int) != y_test)
-    # print(f"Best threshold: {best_threshold}, Test error: {test_error}")
+
+
+    fpr, tpr, thresholds, y_prob = plot_roc(X_train, y_train, X_test, y_test)
+    best_thr_idx = np.argmax(tpr - fpr)
+    best_threshold = thresholds[best_thr_idx]
+    test_error = np.mean((y_prob >= best_threshold).astype(int) != y_test)
+    print(f"Best threshold: {best_threshold}, Test error: {test_error}")
 
 
     # Fitting l1- and l2-regularized logistic regression models, using cross-validation to specify values
     # of regularization parameter
-    estimate_LogL1(X_train, y_train, X_test, y_test)
+    estimate_LogReg(X_train, y_train, X_test, y_test, penalty='l1')
+    # estimate_LogReg(X_train, y_train, X_test, y_test, penalty='l2') # TODO this part is depend on the answer from the forum
 
 if __name__ == '__main__':
     np.random.seed(0)
-    # compare_fixed_learning_rates()
+    compare_fixed_learning_rates()
     fit_logistic_regression()
