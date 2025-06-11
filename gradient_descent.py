@@ -121,6 +121,13 @@ class GradientDescent:
 
         """
         best_val,solution = 0, None
+
+        # updated init values 
+        self.callback_(solver=self, weights=f.weights, val=f.compute_output(X=X, y=y), 
+                        grad=f.compute_jacobian(X=X, y=y), t=0, eta=self.learning_rate_.lr_step(t=0),
+                        delta=0) 
+
+
         for t in range(1, self.max_iter_+1):
             # Compute current output and jacbian
             val = f.compute_output(X=X, y=y)
@@ -138,6 +145,7 @@ class GradientDescent:
 
             # Call the callback function with the current state
             self.callback_(solver=self, weights=f.weights, val=val, grad=grad, t=t, eta=eta, delta=delta)
+            
 
             # Update the solution vector if needed
             if self.out_type_ == "best":
